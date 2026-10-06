@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>泰好翻｜Google 中泰翻譯</title>
+<style>
+:root{
+  --bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#64748b;--line:#e5e7eb;
+  --accent:#2563eb;--accent2:#7c3aed;--ok:#059669;--danger:#dc2626;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif
+}
+.app{max-width:760px;margin:auto;padding:14px 14px calc(30px + env(safe-area-inset-bottom))}
+.hero{
+  background:linear-gradient(135deg,#111827,#1d4ed8 58%,#7c3aed);
+  color:white;padding:20px 18px;border-radius:28px;margin:5px 0 12px;
+  box-shadow:0 16px 40px rgba(17,24,39,.14)
+}
+.hero h1{margin:0 0 5px;font-size:25px}
+.hero p{margin:0;font-size:13px;line-height:1.55;color:rgba(255,255,255,.82)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  white-space:nowrap;border:1px solid var(--line);background:white;color:#374151;
+  padding:9px 12px;border-radius:999px;font-weight:800
+}
+.chip.active{background:#111827;color:white;border-color:#111827}
+.card{
+  background:white;border:1px solid var(--line);border-radius:22px;margin-bottom:12px;
+  overflow:hidden;box-shadow:0 10px 25px rgba(17,24,39,.06)
+}
+.head{display:flex;justify-content:space-between;align-items:center;padding:14px 15px 7px}
+.head b{font-size:14px}.badge{font-size:12px;color:var(--muted);background:#f3f4f6;padding:5px 8px;border-radius:999px}
+textarea{
+  width:100%;min-height:145px;border:0;outline:0;resize:vertical;
+  padding:8px 15px 15px;font-size:20px;line-height:1.6;background:transparent;color:var(--text)
+}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}
+select,button{font:inherit}
+select{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white;color:#334155}
+button{border:0;border-radius:14px;padding:12px 14px;font-weight:800;cursor:pointer}
+.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+.secondary{background:#eef2ff;color:#3730a3}
+.ghost{background:#f8fafc;border:1px solid var(--line);color:#334155}
+.result{
+  min-height:145px;padding:10px 15px 15px;font-size:23px;line-height:1.7;
+  white-space:pre-wrap;word-break:break-word
+}
+.placeholder{color:#94a3b8}
+.status{padding:0 15px 12px;font-size:12px;color:var(--muted)}
+.status.ok{color:var(--ok)}.status.err{color:var(--danger)}
+.resultBtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 12px 12px}
+.quick{font-size:13px;color:#475569;font-weight:800;margin:16px 4px 8px}
+.phrases{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.phrase{text-align:left;background:white;border:1px solid var(--line)}
+.phrase b{display:block;font-size:14px}.phrase span{display:block;font-size:12px;color:#64748b;margin-top:3px}
+.note{text-align:center;color:#94a3b8;font-size:11px;line-height:1.6;margin:18px 10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:20px;z-index:99}
+.modal.show{display:flex}
+.big{background:white;border-radius:28px;padding:28px 24px;width:min(900px,100%);font-size:clamp(34px,8vw,72px);line-height:1.45;text-align:center;font-weight:800}
+.close{position:fixed;top:calc(14px + env(safe-area-inset-top));right:16px;width:46px;height:46px;border-radius:50%;background:white;font-size:22px;padding:0}
+@media(max-width:520px){.phrases{grid-template-columns:1fr}.result{font-size:21px}textarea{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hero">
+    <h1>泰好翻 🇹🇼 ⇄ 🇹🇭</h1>
+    <p>Google 翻譯 · 同一頁直接顯示 · 泰文朗讀 · 中文/泰文自動判斷</p>
+  </div>
+
+  <div class="chips">
+    <button class="chip active" data-c="general">一般</button>
+    <button class="chip" data-c="restaurant">🍜 餐廳</button>
+    <button class="chip" data-c="hotel">🏨 飯店</button>
+    <button class="chip" data-c="taxi">🚕 叫車</button>
+    <button class="chip" data-c="shopping">🛍️ 購物</button>
+    <button class="chip" data-c="medical">🏥 醫療</button>
+  </div>
+
+  <section class="card">
+    <div class="head">
+      <b id="srcTitle">輸入中文或泰文</b>
+      <span class="badge" id="detected">自動偵測</span>
+    </div>
+    <textarea id="input" placeholder="例如：請問這個多少錢？如果買兩個可以便宜一點嗎？"></textarea>
+
+    <div class="row">
+      <select id="speaker">
+        <option value="female">女生語氣</option>
+        <option value="male">男生語氣</option>
+        <option value="neutral">中性</option>
+      </select>
+      <select id="tone">
+        <option value="natural">自然口語</option>
+        <option value="polite">較禮貌</option>
+        <option value="simple">簡短好懂</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <button class="secondary" id="clear">清除</button>
+      <button class="primary" id="translate">立即翻譯</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <b id="dstTitle">翻譯結果</b>
+      <span class="badge" id="direction">中文 ⇄ 泰文</span>
+    </div>
+    <div id="result" class="result placeholder">翻譯結果會直接顯示在這裡</div>
+    <div id="status" class="status">輸入內容後按「立即翻譯」</div>
+    <div class="resultBtns">
+      <button class="ghost" id="copy">📋 複製</button>
+      <button class="ghost" id="speak">🔊 朗讀</button>
+      <button class="ghost" id="large">🔎 大字</button>
+    </div>
+  </section>
+
+  <div class="quick">常用旅遊句</div>
+  <div class="phrases" id="phrases"></div>
+
+  <div class="note">
+    本頁使用 Google 翻譯服務取得結果；如果 Google 暫時限制瀏覽器請求，頁面會顯示錯誤提示。<br>
+    朗讀會優先使用 Google 泰文語音，失敗時自動改用手機內建泰文語音。
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <button class="close" id="close">×</button>
+  <div class="big" id="big"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const input=$('#input'),result=$('#result'),statusEl=$('#status');
+let context='general';
+let currentAudio=null;
+
+const groups={
+  general:[
+    ['你好，請問可以幫我一下嗎？','求助'],
+    ['不好意思，我不太會說泰文。','語言'],
+    ['可以說慢一點嗎？','聽不懂'],
+    ['謝謝你！','萬用']
+  ],
+  restaurant:[
+    ['不要辣，完全不要辣，謝謝。','不吃辣'],
+    ['這個有豬肉嗎？','食材'],
+    ['可以幫我打包嗎？','外帶'],
+    ['可以買單嗎？','結帳']
+  ],
+  hotel:[
+    ['我有訂房，可以幫我確認嗎？','入住'],
+    ['可以寄放行李嗎？','行李'],
+    ['房間的冷氣好像有問題。','設備'],
+    ['可以晚一點退房嗎？','退房']
+  ],
+  taxi:[
+    ['麻煩載我到這個地址，謝謝。','出示地址'],
+    ['可以走高速公路嗎？','高速'],
+    ['請在這裡讓我下車，謝謝。','下車'],
+    ['大概還要多久會到？','時間']
+  ],
+  shopping:[
+    ['請問這個多少錢？','問價'],
+    ['如果買兩個，可以便宜一點嗎？','殺價'],
+    ['有其他顏色或尺寸嗎？','款式'],
+    ['可以刷卡嗎？','付款']
+  ],
+  medical:[
+    ['我現在頭很痛，而且有點想吐。','症狀'],
+    ['我對這個藥過敏。','過敏'],
+    ['請問附近有醫院或診所嗎？','找醫療'],
+    ['可以請醫生說慢一點嗎？','看診']
+  ]
+};
+
+function detect(text){
+  const thai=(text.match(/[\u0E00-\u0E7F]/g)||[]).length;
+  const zh=(text.match(/[\u3400-\u9FFF]/g)||[]).length;
+  return thai>zh ? {source:'th',target:'zh-TW'} : {source:'zh-TW',target:'th'};
+}
+
+function sync(){
+  const t=input.value.trim(),d=detect(t);
+  $('#detected').textContent=t?(d.source==='th'?'泰文':'中文'):'自動偵測';
+  if(d.source==='th'){
+    $('#srcTitle').textContent='泰文原文';
+    $('#dstTitle').textContent='中文翻譯';
+    $('#direction').textContent='泰文 → 中文';
+  }else{
+    $('#srcTitle').textContent='中文原文';
+    $('#dstTitle').textContent='泰文翻譯';
+    $('#direction').textContent='中文 → 泰文';
+  }
+}
+
+function cleanGoogleText(text){
+  const el=document.createElement('textarea');
+  el.innerHTML=text;
+  return el.value;
+}
+
+function applyThaiPoliteness(text,source){
+  const speaker=$('#speaker').value;
+  if(speaker==='neutral') return text.replace(/\s*(ค่ะ|คะ|ครับ)\s*$/,'').trim();
+
+  let out=text.trim();
+  if(speaker==='male'){
+    if(/(ค่ะ|คะ)\s*$/.test(out)) return out.replace(/(ค่ะ|คะ)\s*$/,'ครับ');
+    if(/ครับ\s*$/.test(out)) return out;
+    return out+' ครับ';
+  }
+
+  // female
+  if(/ค่ะ|คะ\s*$/.test(out)) return out;
+  const q=/[？?嗎呢嘛]$/.test(source.trim());
+  return out+(q?' คะ':' ค่ะ');
+}
+
+async function googleTranslate(text,source,target){
+  const url='https://translate.googleapis.com/translate_a/single'
+    +'?client=gtx'
+    +'&sl='+encodeURIComponent(source)
+    +'&tl='+encodeURIComponent(target)
+    +'&dt=t'
+    +'&q='+encodeURIComponent(text);
+
+  const r=await fetch(url,{method:'GET'});
+  if(!r.ok) throw new Error('Google 翻譯暫時無法連線');
+  const data=await r.json();
+  if(!Array.isArray(data)||!Array.isArray(data[0])) throw new Error('Google 沒有回傳翻譯結果');
+  return cleanGoogleText(data[0].map(x=>x&&x[0]?x[0]:'').join(''));
+}
+
+async function translateNow(){
+  const text=input.value.trim();
+  if(!text){input.focus();return;}
+
+  sync();
+  result.classList.remove('placeholder');
+  result.textContent='翻譯中…';
+  statusEl.textContent='正在連線 Google 翻譯…';
+  statusEl.className='status';
+
+  try{
+    const d=detect(text);
+    let out=await googleTranslate(text,d.source,d.target);
+
+    if(d.target==='th'){
+      out=applyThaiPoliteness(out,text);
+    }
+
+    result.textContent=out;
+    statusEl.textContent='翻譯完成 · Google';
+    statusEl.className='status ok';
+  }catch(e){
+    result.textContent='目前無法取得翻譯結果。';
+    statusEl.textContent=e.message||'翻譯失敗';
+    statusEl.className='status err';
+  }
+}
+
+function nativeSpeak(text,lang){
+  if(!('speechSynthesis' in window)) throw new Error('No speech synthesis');
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang=lang;
+  u.rate=lang.startsWith('th')?.82:.9;
+  const voices=speechSynthesis.getVoices();
+  const candidates=voices.filter(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()));
+  const preferred=candidates.find(v=>/premium|enhanced|siri|google|kanya|narisa/i.test(v.name))||candidates[0];
+  if(preferred) u.voice=preferred;
+  speechSynthesis.speak(u);
+}
+
+async function speakResult(){
+  const text=result.textContent.trim();
+  if(!text||result.classList.contains('placeholder')) return;
+
+  if(currentAudio){currentAudio.pause();currentAudio=null;}
+  const lang=detect(text).source==='th'?'th':'zh-TW';
+
+  statusEl.textContent='正在準備語音…';
+  statusEl.className='status';
+
+  try{
+    // Google TTS. Cross-origin media playback is attempted first.
+    const tl=lang==='th'?'th':'zh-TW';
+    const src='https://translate.google.com/translate_tts?ie=UTF-8'
+      +'&client=tw-ob'
+      +'&tl='+encodeURIComponent(tl)
+      +'&q='+encodeURIComponent(text.slice(0,190));
+
+    const a=new Audio();
+    currentAudio=a;
+    a.preload='auto';
+    a.src=src;
+    a.onplaying=()=>{
+      statusEl.textContent='🔊 Google 語音播放中';
+      statusEl.className='status ok';
+    };
+    a.onerror=()=>{
+      currentAudio=null;
+      try{
+        nativeSpeak(text,tl==='th'?'th-TH':'zh-TW');
+        statusEl.textContent='🔊 使用手機內建泰文語音';
+        statusEl.className='status ok';
+      }catch{
+        statusEl.textContent='此裝置目前無法朗讀';
+        statusEl.className='status err';
+      }
+    };
+    await a.play();
+  }catch{
+    try{
+      nativeSpeak(text,lang==='th'?'th-TH':'zh-TW');
+      statusEl.textContent='🔊 使用手機內建泰文語音';
+      statusEl.className='status ok';
+    }catch{
+      statusEl.textContent='此裝置目前無法朗讀';
+      statusEl.className='status err';
+    }
+  }
+}
+
+input.addEventListener('input',sync);
+$('#translate').onclick=translateNow;
+$('#clear').onclick=()=>{
+  input.value='';
+  result.textContent='翻譯結果會直接顯示在這裡';
+  result.className='result placeholder';
+  statusEl.textContent='輸入內容後按「立即翻譯」';
+  statusEl.className='status';
+  sync();
+};
+$('#copy').onclick=async()=>{
+  const t=result.textContent.trim();
+  if(!t||result.classList.contains('placeholder')) return;
+  try{
+    await navigator.clipboard.writeText(t);
+    statusEl.textContent='已複製';
+  }catch{
+    statusEl.textContent='請長按翻譯文字複製';
+  }
+};
+$('#speak').onclick=speakResult;
+$('#large').onclick=()=>{
+  const t=result.textContent.trim();
+  if(!t||result.classList.contains('placeholder')) return;
+  $('#big').textContent=t;
+  $('#modal').classList.add('show');
+};
+$('#close').onclick=()=>$('#modal').classList.remove('show');
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').classList.remove('show')};
+
+function render(){
+  const box=$('#phrases');
+  box.innerHTML='';
+  groups[context].forEach(([text,label])=>{
+    const b=document.createElement('button');
+    b.className='phrase';
+    b.innerHTML='<b>'+text+'</b><span>'+label+'</span>';
+    b.onclick=()=>{
+      input.value=text;
+      sync();
+      translateNow();
+    };
+    box.appendChild(b);
+  });
+}
+
+document.querySelectorAll('.chip').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+    btn.classList.add('active');
+    context=btn.dataset.c;
+    render();
+  };
+});
+
+render();
+sync();
+</script>
+</body>
+</html>
