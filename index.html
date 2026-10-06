@@ -128,7 +128,7 @@ button{border:0;border-radius:14px;padding:12px 14px;font-weight:800;cursor:poin
 
   <div class="note">
     本頁使用 Google 翻譯服務取得結果；如果 Google 暫時限制瀏覽器請求，頁面會顯示錯誤提示。<br>
-    朗讀會優先使用 Google 泰文語音，失敗時自動改用手機內建泰文語音。
+    翻譯完成後會自動朗讀；也可以按「🔊 朗讀」再次播放。語音使用手機內建泰文／中文聲線。
   </div>
 </div>
 
@@ -261,6 +261,15 @@ async function translateNow(){
     result.textContent=out;
     statusEl.textContent='翻譯完成 · Google';
     statusEl.className='status ok';
+
+    // 翻譯完成後自動朗讀「翻譯結果」
+    try{
+      const targetLang=d.target==='th'?'th-TH':'zh-TW';
+      nativeSpeak(out,targetLang);
+      statusEl.textContent='翻譯完成 · Google · 🔊 自動朗讀';
+    }catch(e){
+      // 即使語音失敗，也不影響翻譯結果
+    }
   }catch(e){
     result.textContent='目前無法取得翻譯結果。';
     statusEl.textContent=e.message||'翻譯失敗';
@@ -268,16 +277,44 @@ async function translateNow(){
   }
 }
 
+function pickVoice(lang){
+  const voices=speechSynthesis.getVoices();
+  const prefix=lang.slice(0,2).toLowerCase();
+
+  const sameLang=voices.filter(v =>
+    (v.lang||'').toLowerCase().startsWith(prefix)
+  );
+
+  // iPhone / Safari 可能出現的較自然聲線關鍵字
+  return sameLang.find(v =>
+    /premium|enhanced|siri|google|narisa|kanya|thailand|thai/i.test(v.name)
+  ) || sameLang[0] || null;
+}
+
 function nativeSpeak(text,lang){
   if(!('speechSynthesis' in window)) throw new Error('No speech synthesis');
+
   speechSynthesis.cancel();
+
   const u=new SpeechSynthesisUtterance(text);
   u.lang=lang;
-  u.rate=lang.startsWith('th')?.82:.9;
-  const voices=speechSynthesis.getVoices();
-  const candidates=voices.filter(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()));
-  const preferred=candidates.find(v=>/premium|enhanced|siri|google|kanya|narisa/i.test(v.name))||candidates[0];
-  if(preferred) u.voice=preferred;
+  u.rate=lang.startsWith('th') ? 0.82 : 0.9;
+  u.pitch=1;
+  u.volume=1;
+
+  const voice=pickVoice(lang);
+  if(voice) u.voice=voice;
+
+  u.onstart=()=>{
+    statusEl.textContent='🔊 正在朗讀';
+    statusEl.className='status ok';
+  };
+
+  u.onerror=()=>{
+    statusEl.textContent='語音播放失敗，請再按一次「朗讀」';
+    statusEl.className='status err';
+  };
+
   speechSynthesis.speak(u);
 }
 
@@ -285,49 +322,12 @@ async function speakResult(){
   const text=result.textContent.trim();
   if(!text||result.classList.contains('placeholder')) return;
 
-  if(currentAudio){currentAudio.pause();currentAudio=null;}
-  const lang=detect(text).source==='th'?'th':'zh-TW';
-
-  statusEl.textContent='正在準備語音…';
-  statusEl.className='status';
-
   try{
-    // Google TTS. Cross-origin media playback is attempted first.
-    const tl=lang==='th'?'th':'zh-TW';
-    const src='https://translate.google.com/translate_tts?ie=UTF-8'
-      +'&client=tw-ob'
-      +'&tl='+encodeURIComponent(tl)
-      +'&q='+encodeURIComponent(text.slice(0,190));
-
-    const a=new Audio();
-    currentAudio=a;
-    a.preload='auto';
-    a.src=src;
-    a.onplaying=()=>{
-      statusEl.textContent='🔊 Google 語音播放中';
-      statusEl.className='status ok';
-    };
-    a.onerror=()=>{
-      currentAudio=null;
-      try{
-        nativeSpeak(text,tl==='th'?'th-TH':'zh-TW');
-        statusEl.textContent='🔊 使用手機內建泰文語音';
-        statusEl.className='status ok';
-      }catch{
-        statusEl.textContent='此裝置目前無法朗讀';
-        statusEl.className='status err';
-      }
-    };
-    await a.play();
-  }catch{
-    try{
-      nativeSpeak(text,lang==='th'?'th-TH':'zh-TW');
-      statusEl.textContent='🔊 使用手機內建泰文語音';
-      statusEl.className='status ok';
-    }catch{
-      statusEl.textContent='此裝置目前無法朗讀';
-      statusEl.className='status err';
-    }
+    const lang=detect(text).source==='th' ? 'th-TH' : 'zh-TW';
+    nativeSpeak(text,lang);
+  }catch(e){
+    statusEl.textContent='此裝置目前無法朗讀';
+    statusEl.className='status err';
   }
 }
 
